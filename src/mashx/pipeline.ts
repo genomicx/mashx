@@ -3,13 +3,97 @@ import { fetchDatabase } from './dbCache'
 import { fetchMeta } from './meta'
 import { MASH_SKETCH_SIZE, MASH_KMER_SIZE } from './databases'
 
-declare const Aioli: {
-  new (tools: string[]): Promise<AioliInstance>
+// ── Mash WASM types ──────────────────────────────────────────────────────────
+
+interface MashInstance {
+  callMain: (args: string[]) => void
+  FS: {
+    mkdirTree: (path: string) => void
+    writeFile: (path: string, data: Uint8Array | string) => void
+    readFile: (path: string) => Uint8Array
+    unlink: (path: string) => void
+  }
 }
 
-interface AioliInstance {
-  mount: (files: File[] | { name: string; data: ArrayBuffer }[]) => Promise<string[]>
-  exec: (cmd: string) => Promise<{ stdout: string; stderr: string }>
+interface MashRunResult {
+  stdout: string
+  stderr: string
+}
+
+// Cache the WASM binary so we only fetch once
+let wasmBinaryCache: ArrayBuffer | null = null
+
+async function loadWasmBinary(): Promise<ArrayBuffer> {
+  if (wasmBinaryCache) return wasmBinaryCache
+  const response = await fetch('/wasm/mash.wasm')
+  if (!response.ok) throw new Error(`Failed to fetch mash.wasm: ${response.status}`)
+  wasmBinaryCache = await response.arrayBuffer()
+  return wasmBinaryCache
+}
+
+/**
+ * Create a fresh Mash WASM instance.
+ * Each call returns an independent module with its own filesystem.
+ * This is necessary because Emscripten modules have global state
+ * that doesn't reset between callMain() invocations.
+ */
+async function createMashInstance(): Promise<{
+  instance: MashInstance
+  run: (args: string[]) => MashRunResult
+}> {
+  const wasmBinary = await loadWasmBinary()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mashFactory = (window as any).Module
+
+  if (!mashFactory) {
+    throw new Error(
+      'Mash Module not found on window. Ensure /wasm/mash.js is loaded via <script> tag.',
+    )
+  }
+
+  let stdout = ''
+  let stderr = ''
+
+  const instance: MashInstance = await mashFactory({
+    wasmBinary: new Uint8Array(wasmBinary),
+    print: (text: string) => {
+      stdout += text + '\n'
+    },
+    printErr: (text: string) => {
+      stderr += text + '\n'
+    },
+    noInitialRun: true,
+  })
+
+  const run = (args: string[]): MashRunResult => {
+    stdout = ''
+    stderr = ''
+    try {
+      instance.callMain(args)
+    } catch {
+      // Mash may call exit() which throws in Emscripten
+    }
+    return { stdout: stdout.trim(), stderr: stderr.trim() }
+  }
+
+  return { instance, run }
+}
+
+function writeFileToMash(
+  instance: MashInstance,
+  path: string,
+  data: Uint8Array,
+): void {
+  const dir = path.substring(0, path.lastIndexOf('/'))
+  if (dir) {
+    try {
+      instance.FS.mkdirTree(dir)
+    } catch {
+      // Directory may already exist
+    }
+  }
+  instance.FS.writeFile(path, data)
 }
 
 type ProgressCallback = (msg: string, pct: number) => void
@@ -34,14 +118,7 @@ export async function runMashx(
   const sketchSize = options.sketchSize ?? MASH_SKETCH_SIZE
   const kmerSize = options.kmerSize ?? MASH_KMER_SIZE
 
-  // ── Step 1: Initialise Aioli ──────────────────────────────────────────
-  onProgress('Initialising Mash (WebAssembly)...', 2)
-  onLog('[MashX] Loading Mash via biowasm...')
-
-  const CLI: AioliInstance = await new Aioli(['mash/2.3'])
-  onLog('[MashX] Mash ready.')
-
-  // ── Step 2: Load database .msh ────────────────────────────────────────
+  // ── Step 1: Load database .msh ────────────────────────────────────────
   let dbBuffer: ArrayBuffer
   let dbName: string
   let metaUrl: string | undefined
@@ -67,42 +144,73 @@ export async function runMashx(
     onLog(`[MashX] Database loaded (${(dbBuffer.byteLength / 1_000_000).toFixed(1)} MB).`)
   }
 
-  // ── Step 3: Mount files into the WASM filesystem ──────────────────────
-  onProgress('Mounting files...', 37)
-  onLog('[MashX] Mounting query files...')
+  // ── Step 2: Initialise Mash WASM and sketch query files ─────────────
+  onProgress('Initialising Mash (WebAssembly)...', 37)
+  onLog('[MashX] Loading Mash WASM...')
 
-  const mountedDb = await CLI.mount([{ name: 'database.msh', data: dbBuffer }])
-  const mountedQueries = await CLI.mount(queryFiles)
+  const sketchMash = await createMashInstance()
+  onLog('[MashX] Mash ready.')
 
-  onLog(`[MashX] Mounted ${queryFiles.length} query file(s) + database.`)
+  // Read query files and write to virtual filesystem
+  onProgress('Loading query files...', 40)
+  onLog('[MashX] Loading query files into WASM filesystem...')
 
-  // ── Step 4: Sketch query files ────────────────────────────────────────
-  onProgress('Sketching query sequences...', 42)
+  const queryPaths: string[] = []
+  for (const file of queryFiles) {
+    const data = new Uint8Array(await file.arrayBuffer())
+    const path = `/data/${file.name}`
+    writeFileToMash(sketchMash.instance, path, data)
+    queryPaths.push(path)
+    onLog(`[MashX] Loaded ${file.name} (${data.length} bytes)`)
+  }
+
+  // Sketch query sequences
+  onProgress('Sketching query sequences...', 45)
   onLog(`[MashX] Sketching queries (k=${kmerSize}, s=${sketchSize})...`)
 
-  const queryPaths = mountedQueries.join(' ')
-  const sketchCmd = `mash sketch -k ${kmerSize} -s ${sketchSize} -o /tmp/query ${queryPaths}`
-  onLog(`[MashX] $ ${sketchCmd}`)
-  const sketchResult = await CLI.exec(sketchCmd)
-  if (sketchResult.stderr) onLog(`[mash] ${sketchResult.stderr.trim()}`)
+  const sketchArgs = [
+    'sketch', '-o', '/data/query',
+    '-k', String(kmerSize),
+    '-s', String(sketchSize),
+    ...queryPaths,
+  ]
+  onLog(`[MashX] $ mash ${sketchArgs.join(' ')}`)
+  const sketchResult = sketchMash.run(sketchArgs)
+  if (sketchResult.stderr) onLog(`[mash] ${sketchResult.stderr}`)
 
-  // ── Step 5: Run mash dist ─────────────────────────────────────────────
+  // Read the .msh sketch from virtual FS
+  let queryMsh: Uint8Array
+  try {
+    queryMsh = sketchMash.instance.FS.readFile('/data/query.msh')
+    onLog(`[MashX] Query sketch: ${queryMsh.length} bytes`)
+  } catch (err) {
+    throw new Error(`Failed to read query sketch: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // ── Step 3: Run mash dist on a FRESH instance ──────────────────────
   onProgress('Running mash dist...', 60)
+  onLog('[MashX] Initialising fresh Mash WASM for dist...')
+
+  const distMash = await createMashInstance()
+
+  // Write both database and query sketch to the new instance
+  writeFileToMash(distMash.instance, '/data/database.msh', new Uint8Array(dbBuffer))
+  writeFileToMash(distMash.instance, '/data/query.msh', queryMsh)
+
   onLog('[MashX] Running mash dist...')
+  const distArgs = ['dist', '/data/database.msh', '/data/query.msh']
+  onLog(`[MashX] $ mash ${distArgs.join(' ')}`)
+  const distResult = distMash.run(distArgs)
+  if (distResult.stderr) onLog(`[mash] ${distResult.stderr}`)
 
-  const distCmd = `mash dist ${mountedDb[0]} /tmp/query.msh`
-  onLog(`[MashX] $ ${distCmd}`)
-  const distResult = await CLI.exec(distCmd)
-  if (distResult.stderr) onLog(`[mash] ${distResult.stderr.trim()}`)
-
-  // ── Step 6: Parse results ─────────────────────────────────────────────
+  // ── Step 4: Parse results ─────────────────────────────────────────────
   onProgress('Parsing results...', 80)
   onLog('[MashX] Parsing output...')
 
   const rawHits = parseMashDist(distResult.stdout)
   onLog(`[MashX] ${rawHits.length} raw hits parsed.`)
 
-  // ── Step 7: Fetch metadata and annotate ───────────────────────────────
+  // ── Step 5: Fetch metadata and annotate ───────────────────────────────
   let metaMap = new Map<string, { taxName: string; taxId: string; organism: string }>()
   if (metaUrl) {
     onProgress('Fetching taxonomy metadata...', 85)
