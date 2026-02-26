@@ -1,0 +1,25 @@
+{
+  "id": "mashx",
+  "name": "MashX",
+  "tagline": "Browser-based Mash Distance",
+  "description": "Query Mash sketch databases entirely in your browser — upload a FASTA, pick a database, and find closest reference genomes instantly",
+  "icon": "microscope",
+  "tech": ["WebAssembly", "TypeScript", "Vite", "React"],
+  "features": [
+    "Preset databases with browser caching (no repeated downloads)",
+    "User-supplied .msh file support",
+    "Sortable, filterable results table with distance colour coding",
+    "Taxonomy annotation from TSV metadata",
+    "Export results to CSV",
+    "Client-side processing — no data leaves your machine"
+  ],
+  "demoUrl": "https://mashx.vercel.app",
+  "sourceUrl": "https://github.com/genomicx/mashx",
+  "color": "#14B8A6",
+  "status": {
+    "scoping": "done",
+    "pipeline": "in-progress",
+    "webDev": "in-progress",
+    "benchmarking": "not-started"
+  }
+}
