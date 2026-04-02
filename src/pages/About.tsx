@@ -1,6 +1,6 @@
 import { DATABASES } from '../mashx/databases'
 
-export function AboutPage() {
+export function About() {
   return (
     <div className="about-page">
       <section>
