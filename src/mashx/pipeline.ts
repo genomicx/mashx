@@ -3,13 +3,44 @@ import { fetchDatabase } from './dbCache'
 import { fetchMeta } from './meta'
 import { MASH_SKETCH_SIZE, MASH_KMER_SIZE } from './databases'
 
-declare const Aioli: {
-  new (tools: string[]): Promise<AioliInstance>
+const WASM_BASE = 'https://static.genomicx.org/wasm'
+
+// Cached module factory and WASM binary
+let mashFactory: ((opts: object) => Promise<any>) | null = null
+let mashWasmBinary: ArrayBuffer | null = null
+
+async function loadMashFactory() {
+  if (mashFactory && mashWasmBinary) return
+
+  const [jsRes, wasmRes] = await Promise.all([
+    fetch(`${WASM_BASE}/mash.js`),
+    fetch(`${WASM_BASE}/mash.wasm`),
+  ])
+  if (!jsRes.ok) throw new Error(`Failed to fetch mash.js: ${jsRes.status}`)
+  if (!wasmRes.ok) throw new Error(`Failed to fetch mash.wasm: ${wasmRes.status}`)
+
+  const [moduleText, wasmBinary] = await Promise.all([
+    jsRes.text(),
+    wasmRes.arrayBuffer(),
+  ])
+
+  const wrapper = new Function('Module', moduleText + '; return Module;')
+  mashFactory = wrapper({})
+  mashWasmBinary = wasmBinary
 }
 
-interface AioliInstance {
-  mount: (files: File[] | { name: string; data: ArrayBuffer }[]) => Promise<string[]>
-  exec: (cmd: string) => Promise<{ stdout: string; stderr: string }>
+async function createMashInstance(log: (msg: string) => void): Promise<any> {
+  const stdout: string[] = []
+  const stderr: string[] = []
+  const mod = await mashFactory!({
+    wasmBinary: mashWasmBinary!.slice(0),
+    print: (text: string) => { stdout.push(text) },
+    printErr: (text: string) => { stderr.push(text) },
+    noInitialRun: true,
+  })
+  mod._stdout = stdout
+  mod._stderr = stderr
+  return mod
 }
 
 type ProgressCallback = (msg: string, pct: number) => void
@@ -34,11 +65,10 @@ export async function runMashx(
   const sketchSize = options.sketchSize ?? MASH_SKETCH_SIZE
   const kmerSize = options.kmerSize ?? MASH_KMER_SIZE
 
-  // ── Step 1: Initialise Aioli ──────────────────────────────────────────
-  onProgress('Initialising Mash (WebAssembly)...', 2)
-  onLog('[MashX] Loading Mash via biowasm...')
-
-  const CLI: AioliInstance = await new Aioli(['mash/2.3'])
+  // ── Step 1: Load Mash WASM ────────────────────────────────────────────
+  onProgress('Loading Mash (WebAssembly)...', 2)
+  onLog('[MashX] Fetching Mash WASM from static.genomicx.org...')
+  await loadMashFactory()
   onLog('[MashX] Mash ready.')
 
   // ── Step 2: Load database .msh ────────────────────────────────────────
@@ -67,42 +97,64 @@ export async function runMashx(
     onLog(`[MashX] Database loaded (${(dbBuffer.byteLength / 1_000_000).toFixed(1)} MB).`)
   }
 
-  // ── Step 3: Mount files into the WASM filesystem ──────────────────────
-  onProgress('Mounting files...', 37)
-  onLog('[MashX] Mounting query files...')
-
-  const mountedDb = await CLI.mount([{ name: 'database.msh', data: dbBuffer }])
-  const mountedQueries = await CLI.mount(queryFiles)
-
-  onLog(`[MashX] Mounted ${queryFiles.length} query file(s) + database.`)
-
-  // ── Step 4: Sketch query files ────────────────────────────────────────
-  onProgress('Sketching query sequences...', 42)
+  // ── Step 3: Sketch query files ────────────────────────────────────────
+  onProgress('Sketching query sequences...', 37)
   onLog(`[MashX] Sketching queries (k=${kmerSize}, s=${sketchSize})...`)
 
-  const queryPaths = mountedQueries.join(' ')
-  const sketchCmd = `mash sketch -k ${kmerSize} -s ${sketchSize} -o /tmp/query ${queryPaths}`
-  onLog(`[MashX] $ ${sketchCmd}`)
-  const sketchResult = await CLI.exec(sketchCmd)
-  if (sketchResult.stderr) onLog(`[mash] ${sketchResult.stderr.trim()}`)
+  const sketchMod = await createMashInstance(onLog)
 
-  // ── Step 5: Run mash dist ─────────────────────────────────────────────
+  // Write all query files into the sketch instance FS
+  const queryFastaPaths: string[] = []
+  for (const file of queryFiles) {
+    const buf = await file.arrayBuffer()
+    sketchMod.FS.writeFile(`/${file.name}`, new Uint8Array(buf))
+    queryFastaPaths.push(`/${file.name}`)
+  }
+
+  const sketchArgs = ['sketch', '-k', String(kmerSize), '-s', String(sketchSize), '-o', '/tmp/query', ...queryFastaPaths]
+  onLog(`[MashX] $ mash ${sketchArgs.join(' ')}`)
+  try {
+    sketchMod.callMain(sketchArgs)
+  } catch {
+    // mash sketch calls exit() which throws in Emscripten
+  }
+
+  if (sketchMod._stderr.join('').includes('ERROR')) {
+    throw new Error(`mash sketch failed: ${sketchMod._stderr.join('\n')}`)
+  }
+
+  // Extract the sketch output for the dist instance
+  const queryMsh = sketchMod.FS.readFile('/tmp/query.msh') as Uint8Array
+  onLog(`[MashX] Sketch complete (${(queryMsh.byteLength / 1024).toFixed(0)} KB).`)
+
+  // ── Step 4: Run mash dist ─────────────────────────────────────────────
   onProgress('Running mash dist...', 60)
   onLog('[MashX] Running mash dist...')
 
-  const distCmd = `mash dist ${mountedDb[0]} /tmp/query.msh`
-  onLog(`[MashX] $ ${distCmd}`)
-  const distResult = await CLI.exec(distCmd)
-  if (distResult.stderr) onLog(`[mash] ${distResult.stderr.trim()}`)
+  const distMod = await createMashInstance(onLog)
+  distMod.FS.writeFile('/database.msh', new Uint8Array(dbBuffer))
+  distMod.FS.writeFile('/query.msh', queryMsh)
 
-  // ── Step 6: Parse results ─────────────────────────────────────────────
+  const distArgs = ['dist', '/database.msh', '/query.msh']
+  onLog(`[MashX] $ mash ${distArgs.join(' ')}`)
+  try {
+    distMod.callMain(distArgs)
+  } catch {
+    // mash dist calls exit() which throws
+  }
+
+  if (distMod._stderr.join('').includes('ERROR')) {
+    throw new Error(`mash dist failed: ${distMod._stderr.join('\n')}`)
+  }
+
+  // ── Step 5: Parse results ─────────────────────────────────────────────
   onProgress('Parsing results...', 80)
   onLog('[MashX] Parsing output...')
 
-  const rawHits = parseMashDist(distResult.stdout)
+  const rawHits = parseMashDist(distMod._stdout.join('\n'))
   onLog(`[MashX] ${rawHits.length} raw hits parsed.`)
 
-  // ── Step 7: Fetch metadata and annotate ───────────────────────────────
+  // ── Step 6: Fetch metadata and annotate ───────────────────────────────
   let metaMap = new Map<string, { taxName: string; taxId: string; organism: string }>()
   if (metaUrl) {
     onProgress('Fetching taxonomy metadata...', 85)
@@ -116,7 +168,6 @@ export async function runMashx(
     return { ...hit, ...meta }
   })
 
-  // Sort by distance ascending, take top N
   const sorted = annotated
     .sort((a, b) => a.distance - b.distance)
     .slice(0, options.topN)
@@ -155,7 +206,6 @@ function lookupMeta(
   reference: string,
   metaMap: Map<string, { taxName: string; taxId: string; organism: string }>,
 ) {
-  // Try full ID first, then accession prefix
   const direct = metaMap.get(reference)
   if (direct) return direct
   const prefix = reference.split('.')[0]

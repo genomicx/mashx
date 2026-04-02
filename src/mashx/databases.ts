@@ -30,8 +30,7 @@ export const DATABASES: DatabaseConfig[] = [
     id: 'kalamari-v5.8.3',
     name: 'Kalamari',
     description: 'Curated complete assemblies for public health pathogens',
-    // Replace with actual CORS-accessible URL once hosted (e.g. Cloudflare R2 or S3)
-    url: 'https://github.com/lskatz/Kalamari/releases/download/v5.8.3/kalamari-v5.8.3.msh',
+    url: 'https://static.genomicx.org/db/kalamari-v5.8.3.msh',
     metaUrl: 'https://raw.githubusercontent.com/lskatz/Kalamari/master/src/chromosomes.tsv',
     sizeBytes: 78_700_000,
     version: 'v5.8.3',
