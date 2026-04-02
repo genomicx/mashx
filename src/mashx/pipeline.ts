@@ -29,7 +29,7 @@ async function loadMashFactory() {
   mashWasmBinary = wasmBinary
 }
 
-async function createMashInstance(log: (msg: string) => void): Promise<any> {
+async function createMashInstance(): Promise<any> {
   const stdout: string[] = []
   const stderr: string[] = []
   const mod = await mashFactory!({
@@ -101,7 +101,7 @@ export async function runMashx(
   onProgress('Sketching query sequences...', 37)
   onLog(`[MashX] Sketching queries (k=${kmerSize}, s=${sketchSize})...`)
 
-  const sketchMod = await createMashInstance(onLog)
+  const sketchMod = await createMashInstance()
 
   // Write all query files into the sketch instance FS
   const queryFastaPaths: string[] = []
@@ -131,7 +131,7 @@ export async function runMashx(
   onProgress('Running mash dist...', 60)
   onLog('[MashX] Running mash dist...')
 
-  const distMod = await createMashInstance(onLog)
+  const distMod = await createMashInstance()
   distMod.FS.writeFile('/database.msh', new Uint8Array(dbBuffer))
   distMod.FS.writeFile('/query.msh', queryMsh)
 
