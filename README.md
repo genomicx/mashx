@@ -1,43 +1,44 @@
-# mashx
+# MashX
 
-Browser-based Mash distance tool for querying precompiled sketch databases. No data leaves your machine — all computation runs via WebAssembly.
+> Browser-based Mash distance tool for rapid species identification — no server required.
 
-## Getting started
+MashX is a browser-based Mash distance tool for rapid species identification and contamination screening. Upload one or more bacterial genome assemblies in FASTA format, choose a sketch database, and find the closest matching reference genomes — all computed locally using WebAssembly. No installation or data upload required.
+
+## Features
+
+- Rapid species identification against reference genome databases
+- Multi-sample batch processing — screen any number of assemblies at once
+- Results ranked by Mash distance with taxonomy annotation
+- Multiple reference databases (Kalamari, RefSeq representatives, and more)
+- CSV export of all results
+- Works offline after first database download — databases cached in browser
+
+## Tech Stack
+
+- **Mash** — MinHash distance estimation (via Aioli/biowasm WebAssembly)
+- **React + Vite** — frontend framework
+- **Cloudflare Pages + R2** — hosting and database storage
+
+## Getting Started
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Adding databases
+Open http://localhost:5173
 
-Edit `src/mashx/databases.ts` and append a new entry to the `DATABASES` array:
-
-```ts
-{
-  id: 'my-database-v1',         // unique slug, used as cache key
-  name: 'My Database',
-  description: 'What it contains',
-  url: 'https://your-cdn.example.com/my-database-v1.msh',  // must be CORS-accessible
-  metaUrl: 'https://...tsv',    // optional: TSV with columns Assembly, TaxID, Name
-  sizeBytes: 50_000_000,        // rough estimate for progress display
-  version: 'v1.0',
-  citation: 'Author et al. 2024. ...',
-}
-```
-
-**CORS requirement:** The `.msh` URL must be served with permissive CORS headers (`Access-Control-Allow-Origin: *`). GitHub release assets do not support CORS. Host on Cloudflare R2, AWS S3, or any CDN with CORS enabled.
-
-To bump the cache version (force all users to re-download), update `CACHE_VERSION` in `databases.ts`.
-
-## Scripts
+## Running Tests
 
 ```bash
-npm run dev          # development server
-npm run build        # production build
-npm run check        # test + lint + build
+npm test           # unit tests
+npm run test:e2e   # end-to-end tests (requires build first)
 ```
+
+## Contributing
+
+Contributions welcome. Please open an issue first to discuss changes.
 
 ## License
 
-GPL-3.0-only — Nabil-Fareed Alikhan <nabil@happykhan.com>
+GPL-3.0-only — see [LICENSE](LICENSE)
