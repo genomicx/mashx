@@ -258,30 +258,30 @@
 
 /* ── Run button ──────────────────────────────── */
 .run-button {
-  width: 100%;
-  padding: 0.85rem 2rem;
-  background: var(--gx-gradient);
-  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 2rem;
+  background: var(--gx-accent);
+  color: var(--gx-text-inverted);
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+  transition: background var(--gx-transition);
   margin-bottom: 1.5rem;
 }
 
 .run-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.4);
+  background: var(--gx-accent-hover);
 }
 
 .run-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 /* ── Progress ────────────────────────────────── */
