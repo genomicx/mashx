@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
+import { StatusBadge } from '@genomicx/ui'
 import type { MashxResult } from '../mashx/types'
 import { exportCsv } from '../mashx/export'
 
@@ -71,10 +72,10 @@ export function ResultsTable({ result }: ResultsTableProps) {
     return <span className="sort-arrow">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
-  function distanceClass(d: number) {
-    if (d < 0.05) return 'dist-close'
-    if (d < 0.15) return 'dist-medium'
-    return 'dist-far'
+  function distanceVariant(d: number): 'success' | 'warning' | 'error' {
+    if (d < 0.05) return 'success'
+    if (d < 0.15) return 'warning'
+    return 'error'
   }
 
   return (
@@ -155,9 +156,9 @@ export function ResultsTable({ result }: ResultsTableProps) {
                   </td>
                 )}
                 <td>
-                  <span className={`distance-badge ${distanceClass(hit.distance)}`}>
+                  <StatusBadge variant={distanceVariant(hit.distance)}>
                     {hit.distance.toFixed(4)}
-                  </span>
+                  </StatusBadge>
                 </td>
                 <td className="mono">{hit.pValue.toExponential(2)}</td>
                 <td className="mono">{hit.sharedHashes}</td>

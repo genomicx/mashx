@@ -339,19 +339,6 @@
 .taxid-link { color: var(--gx-accent); font-family: var(--gx-font-mono); font-size: 0.82rem; }
 .taxid-link:hover { text-decoration: underline; }
 
-/* Distance colour coding */
-.distance-badge {
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--gx-radius-pill);
-  font-family: var(--gx-font-mono);
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-.dist-close  { background: rgba(22,163,74,0.15);  color: var(--gx-success); }
-.dist-medium { background: rgba(245,158,11,0.15); color: var(--gx-warning); }
-.dist-far    { background: rgba(239,68,68,0.12);  color: var(--gx-error); }
 
 /* ── About page ──────────────────────────────── */
 .about-page { max-width: 700px; }

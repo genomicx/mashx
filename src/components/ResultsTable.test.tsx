@@ -93,16 +93,16 @@ describe('ResultsTable', () => {
     expect(screen.getByText(/3 of 3 hits/)).toBeInTheDocument()
   })
 
-  it('applies distance color classes', () => {
+  it('applies distance variant classes', () => {
     render(<ResultsTable result={mockResult} />)
-    // 0.001 should be dist-close
+    // 0.001 should be success (close)
     const closeBadge = screen.getByText('0.0010')
-    expect(closeBadge.className).toContain('dist-close')
-    // 0.1 should be dist-medium
+    expect(closeBadge.className).toContain('gx-badge--success')
+    // 0.1 should be warning (medium)
     const medBadge = screen.getByText('0.1000')
-    expect(medBadge.className).toContain('dist-medium')
-    // 0.2 should be dist-far
+    expect(medBadge.className).toContain('gx-badge--warning')
+    // 0.2 should be error (far)
     const farBadge = screen.getByText('0.2000')
-    expect(farBadge.className).toContain('dist-far')
+    expect(farBadge.className).toContain('gx-badge--error')
   })
 })
