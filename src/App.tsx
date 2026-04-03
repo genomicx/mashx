@@ -121,7 +121,16 @@ function App() {
 
   return (
     <div className="app">
-      <NavBar appName="MASHX" appSubtitle="Browser-based Mash distance tool" />
+      <NavBar
+        appName="MASHX"
+        appSubtitle="Browser-based Mash distance tool"
+        icon={
+          <svg className="gx-nav-logo-icon" viewBox="0 0 24 24" fill="none" stroke="var(--gx-accent)" strokeWidth="2">
+            {/* Waveform/sketch icon representing MinHash */}
+            <polyline points="2,12 5,7 8,15 11,9 14,13 17,6 20,12 22,12" />
+          </svg>
+        }
+      />
 
       <main className="app-main">
         <Routes>
@@ -130,7 +139,7 @@ function App() {
         </Routes>
       </main>
 
-      <AppFooter appName="MASHX" />
+      <AppFooter appName="MASHX" bugReportUrl="https://github.com/genomicx/mashx/issues" />
     </div>
   )
 }
