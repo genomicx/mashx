@@ -114,6 +114,7 @@ function App() {
       <NavBar
         appName="MASHX"
         appSubtitle="Browser-based Mash distance tool"
+        githubUrl="https://github.com/genomicx/mashx"
         icon={
           <svg className="gx-nav-logo-icon" viewBox="0 0 24 24" fill="none" stroke="var(--gx-accent)" strokeWidth="2">
             {/* Waveform/sketch icon representing MinHash */}
