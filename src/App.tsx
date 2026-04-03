@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Routes, Route } from 'react-router-dom'
-import { NavBar, AppFooter, LogConsole } from '@genomicx/ui'
-import { FileUpload } from './components/FileUpload'
+import { NavBar, AppFooter, LogConsole, FileUpload, ProgressBar } from '@genomicx/ui'
 import { DatabaseSelector } from './components/DatabaseSelector'
 import { ResultsTable } from './components/ResultsTable'
 import { OptionsPanel } from './components/OptionsPanel'
@@ -87,16 +86,7 @@ function AnalysisPage() {
 
       {running && (
         <section className="progress" aria-live="polite">
-          <div
-            className="progress-bar"
-            role="progressbar"
-            aria-valuenow={Math.round(progressPct)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            <div className="progress-fill" style={{ width: `${progressPct}%` }} />
-          </div>
-          <p className="progress-text">{progress}</p>
+          <ProgressBar value={progressPct} label={progress} />
         </section>
       )}
 

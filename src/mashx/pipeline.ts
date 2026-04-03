@@ -2,45 +2,10 @@ import type { MashHit, MashxResult, MashxOptions, DatabaseSource } from './types
 import { fetchDatabase } from './dbCache'
 import { fetchMeta } from './meta'
 import { MASH_SKETCH_SIZE, MASH_KMER_SIZE } from './databases'
+import { loadWasmModule, createModuleInstance } from '@genomicx/ui'
 
-const WASM_BASE = 'https://static.genomicx.org/wasm'
-
-// Cached module factory and WASM binary
-let mashFactory: ((opts: object) => Promise<any>) | null = null
-let mashWasmBinary: ArrayBuffer | null = null
-
-async function loadMashFactory() {
-  if (mashFactory && mashWasmBinary) return
-
-  const [jsRes, wasmRes] = await Promise.all([
-    fetch(`${WASM_BASE}/mash.js`),
-    fetch(`${WASM_BASE}/mash.wasm`),
-  ])
-  if (!jsRes.ok) throw new Error(`Failed to fetch mash.js: ${jsRes.status}`)
-  if (!wasmRes.ok) throw new Error(`Failed to fetch mash.wasm: ${wasmRes.status}`)
-
-  const [moduleText, wasmBinary] = await Promise.all([
-    jsRes.text(),
-    wasmRes.arrayBuffer(),
-  ])
-
-  const wrapper = new Function('Module', moduleText + '; return Module;')
-  mashFactory = wrapper({})
-  mashWasmBinary = wasmBinary
-}
-
-async function createMashInstance(): Promise<any> {
-  const stdout: string[] = []
-  const stderr: string[] = []
-  const mod = await mashFactory!({
-    wasmBinary: mashWasmBinary!.slice(0),
-    print: (text: string) => { stdout.push(text) },
-    printErr: (text: string) => { stderr.push(text) },
-    noInitialRun: true,
-  })
-  mod._stdout = stdout
-  mod._stderr = stderr
-  return mod
+async function createMashInstance() {
+  return createModuleInstance('mash')
 }
 
 type ProgressCallback = (msg: string, pct: number) => void
@@ -68,7 +33,7 @@ export async function runMashx(
   // ── Step 1: Load Mash WASM ────────────────────────────────────────────
   onProgress('Loading Mash (WebAssembly)...', 2)
   onLog('[MashX] Fetching Mash WASM from static.genomicx.org...')
-  await loadMashFactory()
+  await loadWasmModule('mash')
   onLog('[MashX] Mash ready.')
 
   // ── Step 2: Load database .msh ────────────────────────────────────────
