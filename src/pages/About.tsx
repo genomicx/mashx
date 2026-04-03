@@ -39,7 +39,7 @@ export function About() {
       <section>
         <h2>How it works</h2>
         <p>
-          mashx sketches your query FASTA files using Mash (via biowasm), then
+          mashx sketches your query FASTA files using Mash (via WebAssembly), then
           computes distances against the selected precompiled sketch database.
           Results are sorted by Mash distance and annotated with taxonomy
           information where available.
