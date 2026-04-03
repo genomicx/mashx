@@ -8,6 +8,7 @@ import { About } from './pages/About'
 import { runMashx } from './mashx/pipeline'
 import { DEFAULT_OPTIONS } from './mashx/types'
 import type { MashxResult, MashxOptions, DatabaseSource } from './mashx/types'
+import { APP_VERSION } from './lib/version'
 import './App.css'
 
 function AnalysisPage() {
@@ -114,6 +115,7 @@ function App() {
       <NavBar
         appName="MASHX"
         appSubtitle="Browser-based Mash distance tool"
+        version={APP_VERSION}
         githubUrl="https://github.com/genomicx/mashx"
         icon={
           <svg className="gx-nav-logo-icon" viewBox="0 0 24 24" fill="none" stroke="var(--gx-accent)" strokeWidth="2">
