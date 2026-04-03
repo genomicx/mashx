@@ -1,28 +1,22 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { LogConsole } from './LogConsole'
+import { LogConsole } from '@genomicx/ui'
 
 describe('LogConsole', () => {
-  it('renders nothing when lines array is empty', () => {
-    const { container } = render(<LogConsole lines={[]} />)
-    expect(container.innerHTML).toBe('')
+  it('renders empty state when logs array is empty', () => {
+    render(<LogConsole logs={[]} />)
+    expect(screen.getByText(/no logs yet/i)).toBeInTheDocument()
   })
 
   it('renders log lines', () => {
-    const lines = ['[MashX] Starting...', '[MashX] Done.']
-    render(<LogConsole lines={lines} />)
-
+    const logs = ['[MashX] Starting...', '[MashX] Done.']
+    render(<LogConsole logs={logs} />)
     expect(screen.getByText(/Starting\.\.\./)).toBeInTheDocument()
     expect(screen.getByText(/Done\./)).toBeInTheDocument()
   })
 
-  it('shows the entry count', () => {
-    render(<LogConsole lines={['line1', 'line2', 'line3']} />)
-    expect(screen.getByText('3 entries')).toBeInTheDocument()
-  })
-
   it('renders a copy log button', () => {
-    render(<LogConsole lines={['test']} />)
-    expect(screen.getByText('Copy Log')).toBeInTheDocument()
+    render(<LogConsole logs={['test']} />)
+    expect(screen.getByText(/copy/i)).toBeInTheDocument()
   })
 })
