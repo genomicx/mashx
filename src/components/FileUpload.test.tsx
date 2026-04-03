@@ -1,30 +1,35 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { FileUpload } from './FileUpload'
+import { FileUpload } from '@genomicx/ui'
 
 describe('FileUpload', () => {
-  it('renders the upload prompt when no files selected', () => {
-    render(<FileUpload files={[]} onFilesChange={() => {}} disabled={false} />)
-    expect(
-      screen.getByText('Drop query genomes or click to browse'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('.fasta, .fa, .fna, .fsa, .gz')).toBeInTheDocument()
+  it('renders drop zone prompt when no files selected', () => {
+    render(<FileUpload files={[]} onFilesChange={() => {}} />)
+    expect(screen.getByText('Drop files here or click to browse')).toBeInTheDocument()
   })
 
-  it('renders file count and names when files are selected', () => {
-    const files = [
-      new File([''], 'sample1.fasta'),
-      new File([''], 'sample2.fa'),
-    ]
-    render(<FileUpload files={files} onFilesChange={() => {}} disabled={false} />)
-    expect(screen.getByText('2 file(s) selected')).toBeInTheDocument()
+  it('shows file count when one file is selected', () => {
+    const files = [new File([''], 'sample.fasta')]
+    render(<FileUpload files={files} onFilesChange={() => {}} />)
+    expect(screen.getByText('1 file selected')).toBeInTheDocument()
+  })
+
+  it('shows plural file count when multiple files selected', () => {
+    const files = [new File([''], 'sample1.fasta'), new File([''], 'sample2.fa')]
+    render(<FileUpload files={files} onFilesChange={() => {}} />)
+    expect(screen.getByText('2 files selected')).toBeInTheDocument()
+  })
+
+  it('lists selected filenames', () => {
+    const files = [new File([''], 'sample1.fasta'), new File([''], 'sample2.fa')]
+    render(<FileUpload files={files} onFilesChange={() => {}} />)
     expect(screen.getByText('sample1.fasta')).toBeInTheDocument()
     expect(screen.getByText('sample2.fa')).toBeInTheDocument()
   })
 
-  it('has accessible file input', () => {
-    render(<FileUpload files={[]} onFilesChange={() => {}} disabled={false} />)
-    const inputs = screen.getAllByLabelText('Upload query genome files')
-    expect(inputs.length).toBeGreaterThan(0)
+  it('disables file input when disabled', () => {
+    render(<FileUpload files={[]} onFilesChange={() => {}} disabled={true} />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    expect(input).toBeDisabled()
   })
 })
