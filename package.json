@@ -5,7 +5,7 @@
   "type": "module",
   "license": "GPL-3.0-only",
   "author": "Nabil-Fareed Alikhan <nabil@happykhan.com> (https://www.happykhan.com)",
-  "homepage": "https://mashx.vercel.app",
+  "homepage": "https://mashx.genomicx.org",
   "repository": {
     "type": "git",
     "url": "https://github.com/genomicx/mashx.git"
@@ -31,7 +31,7 @@
     "check": "vitest run && eslint . && npm run build"
   },
   "dependencies": {
-    "@genomicx/ui": "^0.7.1",
+    "@genomicx/ui": "^0.8.0",
     "file-saver": "^2.0.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
