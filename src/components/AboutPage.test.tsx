@@ -10,7 +10,7 @@ function renderAbout() {
 describe('AboutPage', () => {
   it('renders the about heading', () => {
     renderAbout()
-    expect(screen.getByRole('heading', { name: 'About mashx' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'About MashX' })).toBeInTheDocument()
   })
 
   it('renders the privacy note', () => {
