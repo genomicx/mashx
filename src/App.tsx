@@ -139,7 +139,7 @@ function App() {
         </Routes>
       </main>
 
-      <AppFooter appName="MASHX" bugReportUrl="https://github.com/genomicx/mashx/issues" />
+      <AppFooter appName="MASHX" bugReportEmail="nabil@happykhan.com" bugReportUrl="https://github.com/genomicx/mashx/issues" />
     </div>
   )
 }
