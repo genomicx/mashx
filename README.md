@@ -2,6 +2,8 @@
 
 > Browser-based Mash distance tool for rapid species identification — no server required.
 
+**Launch:** [mashx.genomicx.org](https://mashx.genomicx.org)
+
 MashX is a browser-based Mash distance tool for rapid species identification and contamination screening. Upload one or more bacterial genome assemblies in FASTA format, choose a sketch database, and find the closest matching reference genomes — all computed locally using WebAssembly. No installation or data upload required.
 
 ## Features
